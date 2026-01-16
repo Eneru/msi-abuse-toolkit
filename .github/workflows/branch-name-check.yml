@@ -1,0 +1,24 @@
+name: Branch Name Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Branch Name
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const branchName = context.payload.pull_request.head.ref;
+            const classicBranchPattern = /^((feature)|(fix))\/[\w-]+$/;
+            const taskBranchPattern = /^((feature)|(fix))\/[\w-]+-task\/[\w-]+$/;
+
+            if (!classicBranchPattern.test(branchName) && !taskBranchPattern.test(branchName)) {
+              core.setFailed('Branch name does not match the required format: feature/xxx, fix/xxx or if you want to make sub-branches feature/xxx-task/yyy, fix/xxx-task/yyy');
+            } else {
+              console.log('Branch name matches the required format');
+            }
