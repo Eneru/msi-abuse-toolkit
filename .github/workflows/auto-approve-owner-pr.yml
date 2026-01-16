@@ -1,0 +1,94 @@
+name: Auto-approve PR from repository owner
+
+on:
+  workflow_run:
+    workflows: ['Upload PR number', 'Branch Name Check']
+    types:
+      - completed
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+
+    steps:          
+      - name: Check if workflows runned successfully
+        id: check_workflows
+        run: |
+          if [ ${{ github.event.workflow_run.conclusion == 'success' }} ]; then
+            echo "has_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get PR number artifact
+        id: get_pr_number_artifact
+        if: failure() && steps.check_workflows.outputs.has_passed == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               run_id: context.payload.workflow_run.id,
+            });
+            let matchArtifact = allArtifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "pr_number"
+            })[0];
+            let download = await github.rest.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: matchArtifact.id,
+               archive_format: 'zip',
+            });
+            const fs = require('fs');
+            const path = require('path');
+            const temp = '${{ runner.temp }}/artifacts';
+            if (!fs.existsSync(temp)){
+              fs.mkdirSync(temp);
+            }
+            fs.writeFileSync(path.join(temp, 'pr_number.zip'), Buffer.from(download.data));
+
+      - name: Unzip PR number artifact
+        id: unzip_pr_number_artifact
+        if: failure() && steps.check_workflows.outputs.has_passed == 'true'
+        run: unzip "${{ runner.temp }}/artifacts/pr_number.zip" -d "${{ runner.temp }}/artifacts"
+
+      - name: Check if PR author is repository owner and state if open
+        id: check_owner_and_state
+        if: failure() && steps.check_workflows.outputs.has_passed == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const temp = '${{ runner.temp }}/artifacts';
+            const pr_number = Number(fs.readFileSync(path.join(temp, 'pr_number')));
+            const pull_data = await github.rest.pulls.get(
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr_number,
+            );
+            if(pull_data.user.login === context.repo.owner && pull_data.state === 'open'){
+              core.setOutput('must_be_run', 'true');
+            }
+            else {
+              core.setOutput('must_be_run', 'false');
+            }
+
+      - name: Auto-approve PR
+        id: auto_approve
+        if: failure() && steps.check_workflows.outputs.has_passed == 'true' && steps.check_owner_and_state.outputs.must_be_run == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const temp = '${{ runner.temp }}/artifacts';
+            const pr_number = Number(fs.readFileSync(path.join(temp, 'pr_number')));
+            await github.rest.pulls.createReview(
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr_number,
+              body: 'Auto-approve by owner',
+              event: 'APPROVE'
+            );

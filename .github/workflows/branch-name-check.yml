@@ -9,9 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check Branch Name
+        id: check_branch_name
         uses: actions/github-script@v8
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
             const branchName = context.payload.pull_request.head.ref;
             const classicBranchPattern = /^((feature)|(fix))\/[\w-]+$/;
