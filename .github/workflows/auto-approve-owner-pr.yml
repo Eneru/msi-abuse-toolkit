@@ -22,7 +22,7 @@ jobs:
 
       - name: Get PR number artifact
         id: get_pr_number_artifact
-        if: failure() && steps.check_workflows.outputs.has_passed == 'true'
+        if: success() && steps.check_workflows.outputs.has_passed == 'true'
         uses: actions/github-script@v8
         with:
           script: |
@@ -50,12 +50,12 @@ jobs:
 
       - name: Unzip PR number artifact
         id: unzip_pr_number_artifact
-        if: failure() && steps.check_workflows.outputs.has_passed == 'true'
+        if: success() && steps.check_workflows.outputs.has_passed == 'true'
         run: unzip "${{ runner.temp }}/artifacts/pr_number.zip" -d "${{ runner.temp }}/artifacts"
 
       - name: Check if PR author is repository owner and state if open
         id: check_owner_and_state
-        if: failure() && steps.check_workflows.outputs.has_passed == 'true'
+        if: success() && steps.check_workflows.outputs.has_passed == 'true'
         uses: actions/github-script@v8
         with:
           script: |
@@ -77,7 +77,7 @@ jobs:
 
       - name: Auto-approve PR
         id: auto_approve
-        if: failure() && steps.check_workflows.outputs.has_passed == 'true' && steps.check_owner_and_state.outputs.must_be_run == 'true'
+        if: success() && steps.check_workflows.outputs.has_passed == 'true' && steps.check_owner_and_state.outputs.must_be_run == 'true'
         uses: actions/github-script@v8
         with:
           script: |
